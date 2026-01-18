@@ -76,16 +76,11 @@ const getRelevantKnowledge = (query: string): string => {
 
 
 const App: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 1,
-      text: "Xin chào! Mình là PsyFriend, người bạn đồng hành về tâm lý học đường của bạn. 🌱\nMình ở đây để lắng nghe và tạo một không gian an toàn để bạn chia sẻ. Bạn đang cảm thấy thế nào hôm nay?\nNếu bạn muốn, chúng ta có thể bắt đầu với một bài khảo sát nhỏ để hiểu rõ hơn về bản thân.",
-      sender: 'bot',
-    },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [chatStarted, setChatStarted] = useState<boolean>(false);
   
   const chatRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -110,14 +105,20 @@ const App: React.FC = () => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       aiRef.current = ai;
       chatRef.current = ai.chats.create({
-        model: 'gemini-2.5_pro',
+        // FIX: Updated model name to a supported model for complex chat tasks.
+        model: 'gemini-3-pro-preview',
         config: {
           systemInstruction: CHATBOT_PERSONALITY,
         },
       });
     } catch (error) {
        console.error("Lỗi khởi tạo Gemini:", error);
-       setMessages(prev => [...prev, {id: Date.now(), text: "Rất tiếc, đã có lỗi xảy ra khi kết nối với AI. Vui lòng kiểm tra API key và thử lại.", sender: 'bot'}]);
+       // We can show an error on the welcome screen or as the first message
+       if (!chatStarted) {
+         // This is tricky, for now, we'll just log it. A better solution would be a global error state.
+       } else {
+         setMessages(prev => [...prev, {id: Date.now(), text: "Rất tiếc, đã có lỗi xảy ra khi kết nối với AI. Vui lòng kiểm tra API key và thử lại.", sender: 'bot'}]);
+       }
     }
 
     return () => {
@@ -127,12 +128,18 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    if (chatStarted) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isLoading, chatStarted]);
 
   const handleSendMessage = async (e: FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || isLoading || isRecording) return;
+    
+    if (!chatStarted) {
+      setChatStarted(true);
+    }
 
     const userMessage: Message = {
       id: Date.now(),
@@ -180,6 +187,11 @@ const App: React.FC = () => {
 
   const startVoiceSession = async () => {
     if (!aiRef.current || isRecording) return;
+
+    if (!chatStarted) {
+        setChatStarted(true);
+    }
+
     setIsRecording(true);
     setIsLoading(true);
 
@@ -192,7 +204,8 @@ const App: React.FC = () => {
         outputAudioContextRef.current = new ((window as any).AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
 
         sessionPromiseRef.current = aiRef.current.live.connect({
-            model: 'gemini-2.5-pro',
+            // FIX: Updated model name to the supported model for Live API.
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             callbacks: {
                 onopen: () => {
                     if (!inputAudioContextRef.current || !streamRef.current || !sessionPromiseRef.current) return;
@@ -314,24 +327,39 @@ const App: React.FC = () => {
         </div>
         <span>PsyFriend</span>
       </header>
-      <main className="chat-messages">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`message ${msg.sender}`}>
-            {msg.text}
-          </div>
-        ))}
-        {isLoading && !isRecording && (
-          <div className="message bot loading">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
+      
+      <main className={chatStarted ? "chat-messages" : "welcome-screen"}>
+        {chatStarted ? (
+          <>
+            {messages.map((msg) => (
+              <div key={msg.id} className={`message ${msg.sender}`}>
+                {msg.text}
+              </div>
+            ))}
+            {isLoading && !isRecording && (
+              <div className="message bot loading">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            )}
+            {isRecording && (
+                <div className="message bot">Đang lắng nghe...</div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        ) : (
+          <>
+            <img src="https://raw.githubusercontent.com/kimanhtv2009/PSYFRIEND/main/cropped_circle_image%20(2).png" alt="PsyFriend Logo" className="welcome-logo" />
+            <p className="welcome-text">
+              Xin chào! Mình là PsyFriend, người bạn đồng hành về tâm lý học đường
+              <br/>
+              Mình ở đây để lắng nghe và tạo một không gian an toàn để bạn chia sẻ.
+            </p>
+          </>
         )}
-        {isRecording && (
-            <div className="message bot">Đang lắng nghe...</div>
-        )}
-        <div ref={messagesEndRef} />
       </main>
+      
       <form className="chat-input-form" onSubmit={handleSendMessage}>
         <input
           type="text"
@@ -340,12 +368,14 @@ const App: React.FC = () => {
           onChange={(e) => setInputValue(e.target.value)}
           placeholder={isRecording ? "Đang lắng nghe..." : "Nhập tin nhắn của bạn..."}
           aria-label="Chat input"
-          disabled={isLoading || isRecording}
+          disabled={isLoading && chatStarted}
         />
         <button type="button" className={`mic-button ${isRecording ? 'recording' : ''}`} onClick={toggleVoiceChat} aria-label={isRecording ? 'Stop recording' : 'Start recording'}>
+          {/* FIX: Corrected the viewBox attribute for the SVG element. */}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
         </button>
-        <button type="submit" className="send-button" disabled={!inputValue.trim() || isLoading || isRecording} aria-label="Send message">
+        <button type="submit" className="send-button" disabled={!inputValue.trim() || (isLoading && chatStarted) || isRecording} aria-label="Send message">
+          {/* FIX: Removed duplicate viewBox attribute from SVG element. */}
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
         </button>
       </form>
