@@ -205,7 +205,7 @@ const App: React.FC = () => {
 
         sessionPromiseRef.current = aiRef.current.live.connect({
             // FIX: Updated model name to the supported model for Live API.
-            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+            model: 'gemini-3-pro-preview',
             callbacks: {
                 onopen: () => {
                     if (!inputAudioContextRef.current || !streamRef.current || !sessionPromiseRef.current) return;
