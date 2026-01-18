@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PsyFriend Chatbot</title>
+    <style>
+      :root {
+        --primary-color: #d6a2d0; /* Pastel Purple-Pink */
+        --primary-hover-color: #c88cc0; /* Darker shade for hover */
+        --primary-disabled-color: #e9d3e7; /* Lighter shade for disabled */
+        --secondary-color: #f0f2f5;
+        --background-color: #ffffff;
+        --text-color: #333;
+        --user-message-bg: var(--primary-color);
+        --user-message-text: #ffffff;
+        --bot-message-bg: #f1f0f0; /* Warmer light gray */
+        --bot-message-text: #000000;
+        --font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+          'Helvetica Neue', Arial, sans-serif;
+        --danger-color: #dc3545;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-family);
+        background-image: linear-gradient(to top right, #fce0f8, #e8e0ff); /* Full page gradient background */
+        color: var(--text-color);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      #root {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        max-width: 800px;
+        width: 100%;
+        margin: 0 auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        border-radius: 12px;
+        overflow: hidden;
+        background-color: var(--background-color);
+      }
+      
+      @media (max-width: 800px) {
+        .chat-container {
+          border-radius: 0;
+          box-shadow: none;
+        }
+      }
+
+      .chat-header {
+        position: relative; /* Set positioning context */
+        background-color: var(--primary-color);
+        color: white;
+        padding: 12px 20px;
+        text-align: center;
+        font-size: 1.25rem;
+        font-weight: 600;
+        border-bottom: 1px solid #ddd;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      .header-logo-container {
+        position: absolute;
+        left: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+      }
+
+      .header-logo {
+        height: 32px;
+        width: 32px;
+        display: block;
+      }
+
+      .chat-messages {
+        flex-grow: 1;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background-image: linear-gradient(to bottom, #fff5f8, #f7f5ff); /* Subtle gradient background */
+      }
+
+      .message {
+        display: flex;
+        max-width: 75%;
+        padding: 10px 15px;
+        border-radius: 18px;
+        line-height: 1.5;
+        word-wrap: break-word;
+        white-space: pre-wrap; /* This will preserve line breaks */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      }
+
+      .message.user {
+        background-color: var(--user-message-bg);
+        color: var(--user-message-text);
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+      }
+
+      .message.bot {
+        background-color: var(--bot-message-bg);
+        color: var(--bot-message-text);
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+      }
+
+      .message.loading span {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #888;
+        animation: pulse 1.4s infinite ease-in-out both;
+      }
+
+      .message.loading span:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+
+      .message.loading span:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+
+      @keyframes pulse {
+        0%, 80%, 100% {
+          transform: scale(0);
+        }
+        40% {
+          transform: scale(1.0);
+        }
+      }
+
+      .chat-input-form {
+        display: flex;
+        padding: 12px;
+        border-top: 1px solid #ddd;
+        background-color: #f9f9f9;
+        flex-shrink: 0;
+        gap: 10px;
+      }
+
+      .chat-input {
+        flex-grow: 1;
+        border: 1px solid #ccc;
+        border-radius: 20px;
+        padding: 10px 15px;
+        font-size: 1rem;
+        margin-right: 0;
+        outline: none;
+        transition: border-color 0.2s;
+      }
+      
+      .chat-input:focus {
+        border-color: var(--primary-color);
+      }
+
+      .send-button, .mic-button {
+        background-color: var(--primary-color);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 44px;
+        height: 44px;
+        cursor: pointer;
+        font-size: 1.5rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        transition: background-color 0.2s, box-shadow 0.2s;
+        flex-shrink: 0;
+      }
+      
+      .send-button:hover:not(:disabled) {
+        background-color: var(--primary-hover-color);
+      }
+
+      .send-button:disabled {
+        background-color: var(--primary-disabled-color);
+        cursor: not-allowed;
+      }
+      
+      .mic-button:hover:not(:disabled) {
+        background-color: var(--primary-hover-color);
+      }
+      
+      .mic-button.recording {
+        background-color: var(--danger-color);
+        box-shadow: 0 0 0 4px rgba(220, 53, 69, 0.4);
+        animation: pulse-red 1.5s infinite;
+      }
+
+      @keyframes pulse-red {
+        0% {
+          box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+        }
+        70% {
+          box-shadow: 0 0 0 10px rgba(220, 53, 69, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+        }
+      }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.37.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+
+    <!-- Vercel Speed Insights -->
+    <script>
+      window.va = window.va || function () { (window.va.q = window.va.q || []).push(arguments); };
+    </script>
+    <script src="/_vercel/insights/script.js" defer></script>
+    
+    <!-- Vercel Web Analytics -->
+    <script src="/_vercel/analytics/script.js" defer></script>
+  </body>
+</html>
