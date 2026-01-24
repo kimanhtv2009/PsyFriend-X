@@ -74,6 +74,31 @@ const getRelevantKnowledge = (query: string): string => {
   return relevantChunks.map(chunk => chunk.content).join('\n\n');
 };
 
+// --- Detailed Error Handling ---
+const handleApiError = (error: unknown): string => {
+  console.error("API Error caught:", error);
+  if (error instanceof Error) {
+    const errorMessage = error.message.toLowerCase();
+    if (errorMessage.includes('api key not valid')) {
+      return "Lỗi: API key của bạn không hợp lệ hoặc bị thiếu. Vui lòng kiểm tra lại biến môi trường trên Vercel.";
+    }
+    if (errorMessage.includes('permission denied')) {
+      return "Lỗi: API key của bạn không có quyền truy cập mô hình này. Có thể bạn cần bật thanh toán (billing) trên tài khoản Google Cloud của mình.";
+    }
+    if (errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted')) {
+      return "Lỗi: Bạn đã sử dụng hết hạn mức (quota) cho phép của API key này. Vui lòng thử lại sau hoặc sử dụng một key khác.";
+    }
+     if (errorMessage.includes('model not found')) {
+      return "Lỗi: Tên mô hình AI không hợp lệ hoặc không tồn tại. Vui lòng kiểm tra lại mã nguồn.";
+    }
+    if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+      return "Lỗi: Không thể kết nối đến máy chủ Gemini. Vui lòng kiểm tra kết nối mạng của bạn.";
+    }
+  }
+  // Generic fallback message
+  return 'Xin lỗi, tôi đang gặp một sự cố không mong muốn. Vui lòng thử lại sau.';
+}
+
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -102,23 +127,23 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
+      if (!process.env.API_KEY) {
+        throw new Error("[GoogleGenerativeAI Error]: API key not valid. Please pass a valid API key.");
+      }
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
       aiRef.current = ai;
       chatRef.current = ai.chats.create({
-        // FIX: Updated model name to a supported model for complex chat tasks.
+        // FIX: Upgraded model to gemini-3-pro-preview as requested by the user for a more powerful "pro" experience.
         model: 'gemini-3-pro-preview',
         config: {
           systemInstruction: CHATBOT_PERSONALITY,
         },
       });
     } catch (error) {
-       console.error("Lỗi khởi tạo Gemini:", error);
-       // We can show an error on the welcome screen or as the first message
-       if (!chatStarted) {
-         // This is tricky, for now, we'll just log it. A better solution would be a global error state.
-       } else {
-         setMessages(prev => [...prev, {id: Date.now(), text: "Rất tiếc, đã có lỗi xảy ra khi kết nối với AI. Vui lòng kiểm tra API key và thử lại.", sender: 'bot'}]);
-       }
+       const userFriendlyError = handleApiError(error);
+       // Display initialization error directly in the chat window
+       setMessages([{ id: Date.now(), text: userFriendlyError, sender: 'bot' }]);
+       setChatStarted(true);
     }
 
     return () => {
@@ -173,10 +198,10 @@ const App: React.FC = () => {
       };
       setMessages((prevMessages) => [...prevMessages, botMessage]);
     } catch (error) {
-      console.error('Lỗi khi gửi tin nhắn:', error);
+      const userFriendlyError = handleApiError(error);
       const errorMessage: Message = {
         id: Date.now() + 1,
-        text: 'Xin lỗi, tôi đang gặp sự cố. Vui lòng thử lại sau.',
+        text: userFriendlyError,
         sender: 'bot',
       };
       setMessages((prevMessages) => [...prevMessages, errorMessage]);
@@ -205,7 +230,7 @@ const App: React.FC = () => {
 
         sessionPromiseRef.current = aiRef.current.live.connect({
             // FIX: Updated model name to the supported model for Live API.
-            model: 'gemini-3-pro-preview',
+            model: 'gemini-2.5-flash-native-audio-preview-12-2025',
             callbacks: {
                 onopen: () => {
                     if (!inputAudioContextRef.current || !streamRef.current || !sessionPromiseRef.current) return;
@@ -266,8 +291,8 @@ const App: React.FC = () => {
                    }
                 },
                 onerror: (e: ErrorEvent) => {
-                    console.error('Lỗi voice session:', e);
-                    setMessages(prev => [...prev, { id: Date.now(), text: "Lỗi kết nối voice chat. Vui lòng thử lại.", sender: 'bot' }]);
+                    const userFriendlyError = handleApiError(new Error(e.message));
+                    setMessages(prev => [...prev, { id: Date.now(), text: userFriendlyError, sender: 'bot' }]);
                     stopVoiceSession();
                 },
                 onclose: (e: CloseEvent) => {
@@ -352,7 +377,7 @@ const App: React.FC = () => {
           <>
             <img src="https://raw.githubusercontent.com/kimanhtv2009/PSYFRIEND/main/cropped_circle_image%20(2).png" alt="PsyFriend Logo" className="welcome-logo" />
             <p className="welcome-text">
-              Xin chào! Mình là PsyFriend, người bạn đồng hành về tâm lý học đường
+              Xin chào! Mình là PsyFriend, người bạn đồng hành về tâm lý học đường của bạn. 🌱
               <br/>
               Mình ở đây để lắng nghe và tạo một không gian an toàn để bạn chia sẻ.
             </p>
