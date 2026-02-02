@@ -6,8 +6,8 @@ interface KnowledgeChunk {
 
 export const KNOWLEDGE_BASE_STRUCTURED: KnowledgeChunk[] = [
   {
-    topic: 'narcissism_test',
-    keywords: ['trắc nghiệm', 'bài test', 'thang đo', 'đánh giá ái kỷ', 'kiểm tra', 'câu hỏi', 'làm bài test', '30 mệnh đề', 'chẩn đoán ái kỷ'],
+    topic: 'Tự đánh giá mức độ ái kỷ',
+    keywords: ['trắc nghiệm', 'bài test', 'bảng tự đánh giá', 'đánh giá ái kỷ', 'kiểm tra', 'câu hỏi', 'làm bài test', '30 mệnh đề', 'chẩn đoán ái kỷ'],
     content: `
 **THANG ĐO CHẨN ĐOÁN, ĐÁNH GIÁ MỨC ĐỘ ÁI KỶ Ở HỌC SINH THPT**
 
